@@ -6,7 +6,7 @@ function App() {
   const [config, setConfig] = useState(null);
   const [employeeName, setEmployeeName] = useState("");
   const [employeeId, setEmployeeId] = useState("");
-  const [location, setLocation] = useState(null);
+  const [, setLocation] = useState(null);
   const [logMessages, setLogMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loginDisabled, setLoginDisabled] = useState(false);
@@ -268,13 +268,17 @@ function App() {
   };
 
   useEffect(() => {
+  const run = async () => {
     if (employeeId.trim()) {
-      checkAttendanceToday(employeeId.trim());
+      await checkAttendanceToday(employeeId.trim());
     } else {
       setLoginDisabled(false);
       setLogoutDisabled(false);
     }
-  }, [employeeId]);
+  };
+  run();
+}, [employeeId, checkAttendanceToday]);
+
 
   return (
     <div style={{ padding: 20, fontFamily: "Arial" }}>
