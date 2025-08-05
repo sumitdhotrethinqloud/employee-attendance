@@ -15,13 +15,13 @@
     {
       "name": "Main App View",
       "kind": "board_view",
-      "url": "https://employee-attendance.netlify.app",
+      "url": "https://tq-monday-employee-attendance1.netlify.app/",
       "method": "iframe"
     },
     {
       "name": "Settings",
       "kind": "app_settings",
-      "url": "https://employee-attendance.netlify.app/settings",
+      "url": "https://tq-monday-employee-attendance1.netlify.app/settings",
       "method": "iframe"
     }
   ],  
