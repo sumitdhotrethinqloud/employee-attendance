@@ -1,3 +1,4 @@
+//import React, { useState, useEffect } from "react";
 import React, { useState, useEffect, useCallback } from "react";
 import mondaySdk from "monday-sdk-js";
 const monday = mondaySdk();
@@ -11,34 +12,26 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [loginDisabled, setLoginDisabled] = useState(false);
   const [logoutDisabled, setLogoutDisabled] = useState(false);
-  const [boardId, setBoardId] = useState(null);
-  const [insideMonday, setInsideMonday] = useState(false);
 
   const addLog = (msg) => {
     setLogMessages((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
   };
 
-  // Detect Monday context and load config for the board
   useEffect(() => {
-    monday.listen("context", async (res) => {
-      setInsideMonday(true);
-      if (res.data?.boardId) {
-        setBoardId(res.data.boardId);
-        addLog(`Detected board ID from context: ${res.data.boardId}`);
-
-        try {
-          const stored = await monday.storage.get("config");
-          if (stored?.data) {
-            setConfig(stored.data);
-            addLog("Loaded config from storage: " + JSON.stringify(stored.data));
-          } else {
-            addLog("No config found for this board. Please configure the app in settings.");
-          }
-        } catch (err) {
-          addLog("Error loading config: " + err.message);
+    const loadConfig = async () => {
+      try {
+        const res = await monday.storage.get("config");
+        if (res?.data) {
+          setConfig(res.data);
+          addLog("Loaded config: " + JSON.stringify(res.data));
+        } else {
+          addLog("No config found. Please set it up in app settings.");
         }
+      } catch (err) {
+        addLog("Error loading config: " + err.message);
       }
-    });
+    };
+    loadConfig();
   }, []);
 
   const mondayGraphQL = async (query, variables) => {
@@ -46,50 +39,51 @@ function App() {
   };
 
   const fetchTodayAttendanceItem = useCallback(async (empId, date) => {
-    if (!config) return null;
-    const query = `
-      query ($boardId: ID!, $columnId: String!, $employeeIdVal: String!, $dateColId: String!, $dateVal: String!) {
-        items_page_by_column_values(
-          board_id: $boardId,
-          columns: [
-            { column_id: $columnId, column_values: [$employeeIdVal] },
-            { column_id: $dateColId, column_values: [$dateVal] }
-          ],
-          limit: 50
-        ) {
-          items {
+  if (!config) return null;
+  const query = `
+    query ($boardId: ID!, $columnId: String!, $employeeIdVal: String!, $dateColId: String!, $dateVal: String!) {
+      items_page_by_column_values(
+        board_id: $boardId,
+        columns: [
+          { column_id: $columnId, column_values: [$employeeIdVal] },
+          { column_id: $dateColId, column_values: [$dateVal] }
+        ],
+        limit: 50
+      ) {
+        items {
+          id
+          name
+          column_values(ids: [$columnId, $dateColId]) {
             id
-            name
-            column_values(ids: [$columnId, $dateColId]) {
-              id
-              text
-            }
+            text
           }
         }
       }
-    `;
-
-    const variables = {
-      boardId: config.board_id,
-      columnId: config.employee_id,
-      employeeIdVal: empId,
-      dateColId: config.date,
-      dateVal: date,
-    };
-
-    const res = await mondayGraphQL(query, variables);
-
-    if (res.errors) {
-      addLog("Error fetching items: " + JSON.stringify(res.errors));
-      return null;
     }
+  `;
 
-    return res.data.items_page_by_column_values.items.find(item => {
-      const dateVal = item.column_values.find(cv => cv.id === config.date)?.text || "";
-      const empVal = item.column_values.find(cv => cv.id === config.employee_id)?.text || "";
-      return dateVal === date && empVal === empId;
-    }) || null;
-  }, [config]);
+  const variables = {
+    boardId: config.board_id,
+    columnId: config.employee_id,
+    employeeIdVal: empId,
+    dateColId: config.date,
+    dateVal: date,
+  };
+
+  const res = await mondayGraphQL(query, variables);
+
+  if (res.errors) {
+    addLog("Error fetching items: " + JSON.stringify(res.errors));
+    return null;
+  }
+
+  return res.data.items_page_by_column_values.items.find(item => {
+    const dateVal = item.column_values.find(cv => cv.id === config.date)?.text || "";
+    const empVal = item.column_values.find(cv => cv.id === config.employee_id)?.text || "";
+    return dateVal === date && empVal === empId;
+  }) || null;
+}, [config]);
+
 
   const updateAttendanceItem = async (itemId, attendanceData) => {
     if (!config) return false;
@@ -212,39 +206,41 @@ function App() {
   };
 
   const checkAttendanceToday = useCallback(async (empId) => {
-    if (!config) return;
-    const today = new Date().toISOString().split("T")[0];
-    const existingItem = await fetchTodayAttendanceItem(empId, today);
+  if (!config) return;
+  const today = new Date().toISOString().split("T")[0];
+  const existingItem = await fetchTodayAttendanceItem(empId, today);
 
-    if (!existingItem) {
-      setLoginDisabled(false);
-      setLogoutDisabled(false);
-      addLog("No attendance record found for today.");
-      return;
-    }
+  if (!existingItem) {
+    setLoginDisabled(false);
+    setLogoutDisabled(false);
+    addLog("No attendance record found for today.");
+    return;
+  }
 
-    const query = `
-      query ($itemId: [ID!]!) {
-        items(ids: $itemId) {
+  const query = `
+    query ($itemId: [ID!]!) {
+      items(ids: $itemId) {
+        id
+        column_values(ids: ["${config.login_time}", "${config.logout_time}"]) {
           id
-          column_values(ids: ["${config.login_time}", "${config.logout_time}"]) {
-            id
-            text
-          }
+          text
         }
       }
-    `;
+    }
+  `;
 
-    const res = await mondayGraphQL(query, { itemId: String(existingItem.id) });
-    const cols = res.data.items[0]?.column_values || [];
-    const loginTimeStr = cols.find((c) => c.id === config.login_time)?.text || "";
-    const logoutTimeStr = cols.find((c) => c.id === config.logout_time)?.text || "";
+  const res = await mondayGraphQL(query, { itemId: String(existingItem.id) });
+  const cols = res.data.items[0]?.column_values || [];
+  const loginTimeStr = cols.find((c) => c.id === config.login_time)?.text || "";
+  const logoutTimeStr = cols.find((c) => c.id === config.logout_time)?.text || "";
 
-    setLoginDisabled(!!loginTimeStr);
-    setLogoutDisabled(!!logoutTimeStr);
+  setLoginDisabled(!!loginTimeStr);
+  setLogoutDisabled(!!logoutTimeStr);
 
-    addLog(`Login time: ${loginTimeStr || "not recorded"}, Logout time: ${logoutTimeStr || "not recorded"}`);
-  }, [config, fetchTodayAttendanceItem]);
+  addLog(`Login time: ${loginTimeStr || "not recorded"}, Logout time: ${logoutTimeStr || "not recorded"}`);
+}, [config, fetchTodayAttendanceItem]);
+
+
 
   const handleAttendance = (actionType) => {
     if (!employeeName || !employeeId) {
@@ -277,16 +273,17 @@ function App() {
   };
 
   useEffect(() => {
-    const run = async () => {
-      if (employeeId.trim()) {
-        await checkAttendanceToday(employeeId.trim());
-      } else {
-        setLoginDisabled(false);
-        setLogoutDisabled(false);
-      }
-    };
-    run();
-  }, [employeeId, checkAttendanceToday]);
+  const run = async () => {
+    if (employeeId.trim()) {
+      await checkAttendanceToday(employeeId.trim());
+    } else {
+      setLoginDisabled(false);
+      setLogoutDisabled(false);
+    }
+  };
+  run();
+}, [employeeId, checkAttendanceToday]);
+
 
   return (
     <div style={{ padding: 20, fontFamily: "Arial" }}>

@@ -3,8 +3,6 @@ import mondaySdk from "monday-sdk-js";
 const monday = mondaySdk();
 
 const ConfigUI = () => {
-  console.log("✅ ConfigUI component loaded");
-
   const [boards, setBoards] = useState([]);
   const [columns, setColumns] = useState([]);
   const [selectedBoard, setSelectedBoard] = useState(null);
@@ -23,15 +21,20 @@ const ConfigUI = () => {
     "logout_location",
   ];
 
-  // Detect if running inside Monday iframe
+  // Detect context & auto-select board if available
   useEffect(() => {
     monday.listen("context", (res) => {
       console.log("App context:", res.data);
       setInsideMonday(true);
+
+      if (res.data?.boardId) {
+        console.log("Auto-selecting board:", res.data.boardId);
+        setSelectedBoard(res.data.boardId);
+      }
     });
   }, []);
 
-  // Load boards when inside Monday
+  // Load boards list
   useEffect(() => {
     if (!insideMonday) return;
 
@@ -40,17 +43,22 @@ const ConfigUI = () => {
         setBoards(res.data.boards);
       });
 
+    // Load saved config if exists
     monday.storage.get("config").then((res) => {
       if (res.data) {
-        setSelectedBoard(res.data.board_id);
         const newMapping = { ...res.data };
         delete newMapping.board_id;
         setColumnMapping(newMapping);
+
+        // Use saved board if no context board provided
+        if (!selectedBoard && res.data.board_id) {
+          setSelectedBoard(res.data.board_id);
+        }
       }
     });
   }, [insideMonday]);
 
-  // Load columns when board selected
+  // Load columns when board is selected
   useEffect(() => {
     if (!insideMonday || !selectedBoard) return;
 
@@ -77,7 +85,7 @@ const ConfigUI = () => {
     alert("Configuration saved successfully!");
   };
 
-  // Show fallback if not inside Monday
+  // Show fallback if opened outside Monday
   if (!insideMonday) {
     return (
       <div style={{ padding: 20 }}>
@@ -90,6 +98,7 @@ const ConfigUI = () => {
     <div style={{ padding: 24 }}>
       <h2>Configure Employee Attendance App</h2>
 
+      {/* Board Selector */}
       <label>Select a board:</label>
       <select
         value={selectedBoard || ""}
@@ -102,33 +111,38 @@ const ConfigUI = () => {
         ))}
       </select>
 
-      {selectedBoard && fields.map((field) => (
-        <div key={field} style={{ marginBottom: 10 }}>
-          <label>{field.replace(/_/g, " ")}:</label>
-          <select
-            value={columnMapping[field] || ""}
-            onChange={(e) =>
-              setColumnMapping((prev) => ({
-                ...prev,
-                [field]: e.target.value,
-              }))
-            }
-            style={{ marginLeft: 8, padding: 6 }}
-          >
-            <option value="">-- Select Column --</option>
-            {columns.map((col) => (
-              <option key={col.id} value={col.id}>
-                {col.title} ({col.type})
-              </option>
-            ))}
-          </select>
-        </div>
-      ))}
+      {/* Column Mapping */}
+      {selectedBoard ? (
+        <>
+          {fields.map((field) => (
+            <div key={field} style={{ marginBottom: 10 }}>
+              <label>{field.replace(/_/g, " ")}:</label>
+              <select
+                value={columnMapping[field] || ""}
+                onChange={(e) =>
+                  setColumnMapping((prev) => ({
+                    ...prev,
+                    [field]: e.target.value,
+                  }))
+                }
+                style={{ marginLeft: 8, padding: 6 }}
+              >
+                <option value="">-- Select Column --</option>
+                {columns.map((col) => (
+                  <option key={col.id} value={col.id}>
+                    {col.title} ({col.type})
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
 
-      {selectedBoard && (
-        <button onClick={handleSave} disabled={saving} style={{ marginTop: 20, padding: "10px 20px" }}>
-          {saving ? "Saving..." : "Save Configuration"}
-        </button>
+          <button onClick={handleSave} disabled={saving} style={{ marginTop: 20, padding: "10px 20px" }}>
+            {saving ? "Saving..." : "Save Configuration"}
+          </button>
+        </>
+      ) : (
+        <p style={{ color: "#888" }}>Please select a board to map columns.</p>
       )}
     </div>
   );
