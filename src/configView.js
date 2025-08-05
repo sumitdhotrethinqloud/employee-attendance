@@ -1,4 +1,3 @@
-// src/configView.js
 import React, { useEffect, useState } from "react";
 import mondaySdk from "monday-sdk-js";
 const monday = mondaySdk();
@@ -21,12 +20,28 @@ const ConfigUI = () => {
     "logout_location",
   ];
 
+  // Load context and boards list
   useEffect(() => {
+    monday.listen("context", (res) => {
+      console.log("Settings view context:", res.data);
+    });
+
     monday.api(`query { boards (limit: 50) { id name } }`).then((res) => {
       setBoards(res.data.boards);
     });
+
+    // Load existing config if present
+    monday.storage.get("config").then((res) => {
+      if (res.data) {
+        setSelectedBoard(res.data.board_id);
+        const newMapping = { ...res.data };
+        delete newMapping.board_id;
+        setColumnMapping(newMapping);
+      }
+    });
   }, []);
 
+  // Load columns for the selected board
   useEffect(() => {
     if (!selectedBoard) return;
     monday.api(`query {
@@ -59,7 +74,7 @@ const ConfigUI = () => {
       <label>Select a board:</label>
       <select
         value={selectedBoard || ""}
-        onChange={(e) => setSelectedBoard(e.target.value)}
+        onChange={(e) => setSelectedBoard(Number(e.target.value))}
         style={{ marginBottom: 20, display: "block", padding: 8 }}
       >
         <option value="">-- Select Board --</option>
