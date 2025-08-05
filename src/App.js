@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import mondaySdk from "monday-sdk-js";
 const monday = mondaySdk();
 
@@ -202,40 +203,41 @@ function App() {
     );
   };
 
-  const checkAttendanceToday = async (empId) => {
-    if (!config) return;
-    const today = new Date().toISOString().split("T")[0];
-    const existingItem = await fetchTodayAttendanceItem(empId, today);
+  const checkAttendanceToday = useCallback(async (empId) => {
+  if (!config) return;
+  const today = new Date().toISOString().split("T")[0];
+  const existingItem = await fetchTodayAttendanceItem(empId, today);
 
-    if (!existingItem) {
-      setLoginDisabled(false);
-      setLogoutDisabled(false);
-      addLog("No attendance record found for today.");
-      return;
-    }
+  if (!existingItem) {
+    setLoginDisabled(false);
+    setLogoutDisabled(false);
+    addLog("No attendance record found for today.");
+    return;
+  }
 
-    const query = `
-      query ($itemId: [ID!]!) {
-        items(ids: $itemId) {
+  const query = `
+    query ($itemId: [ID!]!) {
+      items(ids: $itemId) {
+        id
+        column_values(ids: ["${config.login_time}", "${config.logout_time}"]) {
           id
-          column_values(ids: ["${config.login_time}", "${config.logout_time}"]) {
-            id
-            text
-          }
+          text
         }
       }
-    `;
+    }
+  `;
 
-    const res = await mondayGraphQL(query, { itemId: String(existingItem.id) });
-    const cols = res.data.items[0]?.column_values || [];
-    const loginTimeStr = cols.find((c) => c.id === config.login_time)?.text || "";
-    const logoutTimeStr = cols.find((c) => c.id === config.logout_time)?.text || "";
+  const res = await mondayGraphQL(query, { itemId: String(existingItem.id) });
+  const cols = res.data.items[0]?.column_values || [];
+  const loginTimeStr = cols.find((c) => c.id === config.login_time)?.text || "";
+  const logoutTimeStr = cols.find((c) => c.id === config.logout_time)?.text || "";
 
-    setLoginDisabled(!!loginTimeStr);
-    setLogoutDisabled(!!logoutTimeStr);
+  setLoginDisabled(!!loginTimeStr);
+  setLogoutDisabled(!!logoutTimeStr);
 
-    addLog(`Login time: ${loginTimeStr || "not recorded"}, Logout time: ${logoutTimeStr || "not recorded"}`);
-  };
+  addLog(`Login time: ${loginTimeStr || "not recorded"}, Logout time: ${logoutTimeStr || "not recorded"}`);
+}, [config]); // <- dependencies
+
 
   const handleAttendance = (actionType) => {
     if (!employeeName || !employeeId) {
