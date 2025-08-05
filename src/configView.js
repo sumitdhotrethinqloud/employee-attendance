@@ -1,3 +1,4 @@
+// src/configView.js
 import React, { useEffect, useState } from "react";
 import mondaySdk from "monday-sdk-js";
 const monday = mondaySdk();
@@ -21,47 +22,35 @@ const ConfigUI = () => {
     "logout_location",
   ];
 
-  // Detect context & auto-select board if available
   useEffect(() => {
     monday.listen("context", (res) => {
-      console.log("App context:", res.data);
       setInsideMonday(true);
-
       if (res.data?.boardId) {
-        console.log("Auto-selecting board:", res.data.boardId);
         setSelectedBoard(res.data.boardId);
       }
     });
   }, []);
 
-  // Load boards list
   useEffect(() => {
     if (!insideMonday) return;
+    monday.api(`query { boards (limit: 50) { id name } }`).then((res) => {
+      setBoards(res.data.boards);
+    });
 
-    monday.api(`query { boards (limit: 50) { id name } }`)
-      .then((res) => {
-        setBoards(res.data.boards);
-      });
-
-    // Load saved config if exists
     monday.storage.get("config").then((res) => {
       if (res.data) {
         const newMapping = { ...res.data };
         delete newMapping.board_id;
         setColumnMapping(newMapping);
-
-        // Use saved board if no context board provided
         if (!selectedBoard && res.data.board_id) {
           setSelectedBoard(res.data.board_id);
         }
       }
     });
-  }, [insideMonday]);
+  }, [insideMonday, selectedBoard]); // <-- fixed dependency warning
 
-  // Load columns when board is selected
   useEffect(() => {
     if (!insideMonday || !selectedBoard) return;
-
     monday.api(`query {
       boards(ids: ${selectedBoard}) {
         columns {
@@ -85,20 +74,14 @@ const ConfigUI = () => {
     alert("Configuration saved successfully!");
   };
 
-  // Show fallback if opened outside Monday
   if (!insideMonday) {
-    return (
-      <div style={{ padding: 20 }}>
-        <h2>⚠️ This settings page must be opened inside Monday.com</h2>
-      </div>
-    );
+    return <div style={{ padding: 20 }}>⚠️ This settings page must be opened inside Monday.com</div>;
   }
 
   return (
     <div style={{ padding: 24 }}>
       <h2>Configure Employee Attendance App</h2>
 
-      {/* Board Selector */}
       <label>Select a board:</label>
       <select
         value={selectedBoard || ""}
@@ -111,7 +94,6 @@ const ConfigUI = () => {
         ))}
       </select>
 
-      {/* Column Mapping */}
       {selectedBoard ? (
         <>
           {fields.map((field) => (

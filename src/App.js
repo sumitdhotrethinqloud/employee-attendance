@@ -11,21 +11,16 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [loginDisabled, setLoginDisabled] = useState(false);
   const [logoutDisabled, setLogoutDisabled] = useState(false);
-  const [boardId, setBoardId] = useState(null);
-  const [insideMonday, setInsideMonday] = useState(false);
 
   const addLog = (msg) => {
     setLogMessages((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
   };
 
-  // Detect Monday context and load config for the board
+  // Detect Monday context and load config
   useEffect(() => {
     monday.listen("context", async (res) => {
-      setInsideMonday(true);
       if (res.data?.boardId) {
-        setBoardId(res.data.boardId);
         addLog(`Detected board ID from context: ${res.data.boardId}`);
-
         try {
           const stored = await monday.storage.get("config");
           if (stored?.data) {
