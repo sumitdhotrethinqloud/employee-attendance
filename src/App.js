@@ -38,50 +38,52 @@ function App() {
     return monday.api(query, { variables });
   };
 
-  const fetchTodayAttendanceItem = async (empId, date) => {
-    if (!config) return null;
-    const query = `
-      query ($boardId: ID!, $columnId: String!, $employeeIdVal: String!, $dateColId: String!, $dateVal: String!) {
-        items_page_by_column_values(
-          board_id: $boardId,
-          columns: [
-            { column_id: $columnId, column_values: [$employeeIdVal] },
-            { column_id: $dateColId, column_values: [$dateVal] }
-          ],
-          limit: 50
-        ) {
-          items {
+  const fetchTodayAttendanceItem = useCallback(async (empId, date) => {
+  if (!config) return null;
+  const query = `
+    query ($boardId: ID!, $columnId: String!, $employeeIdVal: String!, $dateColId: String!, $dateVal: String!) {
+      items_page_by_column_values(
+        board_id: $boardId,
+        columns: [
+          { column_id: $columnId, column_values: [$employeeIdVal] },
+          { column_id: $dateColId, column_values: [$dateVal] }
+        ],
+        limit: 50
+      ) {
+        items {
+          id
+          name
+          column_values(ids: [$columnId, $dateColId]) {
             id
-            name
-            column_values(ids: [$columnId, $dateColId]) {
-              id
-              text
-            }
+            text
           }
         }
       }
-    `;
-
-    const variables = {
-      boardId: config.board_id,
-      columnId: config.employee_id,
-      employeeIdVal: empId,
-      dateColId: config.date,
-      dateVal: date,
-    };
-
-    const res = await mondayGraphQL(query, variables);
-    if (res.errors) {
-      addLog("Error fetching items: " + JSON.stringify(res.errors));
-      return null;
     }
+  `;
 
-    return res.data.items_page_by_column_values.items.find(item => {
-      const dateVal = item.column_values.find(cv => cv.id === config.date)?.text || "";
-      const empVal = item.column_values.find(cv => cv.id === config.employee_id)?.text || "";
-      return dateVal === date && empVal === empId;
-    }) || null;
+  const variables = {
+    boardId: config.board_id,
+    columnId: config.employee_id,
+    employeeIdVal: empId,
+    dateColId: config.date,
+    dateVal: date,
   };
+
+  const res = await mondayGraphQL(query, variables);
+
+  if (res.errors) {
+    addLog("Error fetching items: " + JSON.stringify(res.errors));
+    return null;
+  }
+
+  return res.data.items_page_by_column_values.items.find(item => {
+    const dateVal = item.column_values.find(cv => cv.id === config.date)?.text || "";
+    const empVal = item.column_values.find(cv => cv.id === config.employee_id)?.text || "";
+    return dateVal === date && empVal === empId;
+  }) || null;
+}, [config]);
+
 
   const updateAttendanceItem = async (itemId, attendanceData) => {
     if (!config) return false;
@@ -236,7 +238,8 @@ function App() {
   setLogoutDisabled(!!logoutTimeStr);
 
   addLog(`Login time: ${loginTimeStr || "not recorded"}, Logout time: ${logoutTimeStr || "not recorded"}`);
-}, [config]); // <- dependencies
+}, [config, fetchTodayAttendanceItem]);
+
 
 
   const handleAttendance = (actionType) => {
