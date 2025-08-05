@@ -1,16 +1,15 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import App from "./App";
-import ConfigUI from "./configView"; // ← the settings UI you'll create
+import ConfigUI from "./configView";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
-  <BrowserRouter>
+  <Router>
     <Routes>
       <Route path="/" element={<App />} />
       <Route path="/settings" element={<ConfigUI />} />
     </Routes>
-  </BrowserRouter>
+  </Router>
 );
-
