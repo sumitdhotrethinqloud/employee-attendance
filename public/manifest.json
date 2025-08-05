@@ -1,33 +1,30 @@
 {
-  "short_name": "React App", 
   "name": "Employee Attendance Logger",
   "description": "Track employee check-in and check-out with geolocation and timestamps.",
   "version": "1.0.0",
-  "dependencies": {
-    "monday": {
-      "client_id": "YOUR_CLIENT_ID"
-    }
-  },
   "integration": {
-    "access_scopes": ["boards:read", "boards:write", "account:read", "updates:write", "users:read"]
+    "access_scopes": [
+      "boards:read",
+      "boards:write",
+      "account:read",
+      "updates:write",
+      "users:read"
+    ]
   },
   "features": [
     {
       "name": "Main App View",
       "kind": "board_view",
-      "url": "https://yourdomain.com",    // Localhost or deployed site
+      "url": "https://employee-attendance.netlify.app",
       "method": "iframe"
     },
     {
       "name": "Settings",
       "kind": "app_settings",
-      "url": "https://yourdomain.com/settings",  // Your settings route
+      "url": "https://employee-attendance.netlify.app/settings",
       "method": "iframe"
     }
-  ],
-
-
-  
+  ],  
   
   "icons": [
     {
